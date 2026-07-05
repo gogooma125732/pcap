@@ -104,6 +104,15 @@ static void print_tcp_flags(u_char flags)
     }
 }
 
+static const char *ip_to_string(struct in_addr addr, char *buf, size_t len)
+{
+    if (inet_ntop(AF_INET, &addr, buf, len) == NULL)
+    {
+        snprintf(buf, len, "invalid");
+    }
+    return buf;
+}
+
 static int is_http_like(const u_char *payload, int len)
 {
     const char *methods[] = {"GET ", "POST ", "HEAD ", "PUT ", "DELETE ", "OPTIONS ", "PATCH ", "HTTP/"};
@@ -253,6 +262,8 @@ void got_packet(u_char *args, const struct pcap_pkthdr *header, const u_char *pa
 
     const struct tcpheader *tcp = (const struct tcpheader *)(packet + ethernet_len + ip_header_len);
     int tcp_header_len = TH_OFF(tcp) * 4;
+    char src_ip[INET_ADDRSTRLEN];
+    char dst_ip[INET_ADDRSTRLEN];
 
     if (tcp_header_len < 20 || ip_total_len < ip_header_len + tcp_header_len)
     {
@@ -267,17 +278,23 @@ void got_packet(u_char *args, const struct pcap_pkthdr *header, const u_char *pa
     printf("Captured length: %u bytes, Original length: %u bytes\n",
            header->caplen, header->len);
 
-    printf("Ethernet Header: ");
+    printf("Ethernet Header\n");
+    printf("  MAC: ");
     print_mac(eth->ether_shost);
     printf(" / ");
     print_mac(eth->ether_dhost);
     printf("\n");
 
-    printf("IP Header:  %s / %s\n", inet_ntoa(ip->iph_sourceip), inet_ntoa(ip->iph_destip));
-    printf("  Header Length: %d bytes | Total Length : %d bytes | TTL: %u\n", ip_header_len, ip_total_len, ip->iph_ttl);
+    printf("IP Header\n");
+    printf("  IP: %s / %s\n",
+           ip_to_string(ip->iph_sourceip, src_ip, sizeof(src_ip)),
+           ip_to_string(ip->iph_destip, dst_ip, sizeof(dst_ip)));
+    printf("  IP Header Length: %d bytes | IP Total Length : %d bytes | TTL: %u\n", ip_header_len, ip_total_len, ip->iph_ttl);
 
-    printf("TCP Header: %u / %u\n", ntohs(tcp->tcp_sport), ntohs(tcp->tcp_dport));
-    printf("  Header Length: %d bytes | FLAGS: ", tcp_header_len);
+    printf("TCP Header\n");
+    printf("  Port: %u / %u\n", ntohs(tcp->tcp_sport), ntohs(tcp->tcp_dport));
+    printf("  TCP Header Length: %d bytes\n", tcp_header_len);
+    printf("  Flags: ");
     print_tcp_flags(tcp->tcp_flags);
     printf("\n");
 
@@ -298,12 +315,12 @@ void got_packet(u_char *args, const struct pcap_pkthdr *header, const u_char *pa
         }
         else
         {
-            printf("HTTP Message: %d bytes, not recognized as plaintext HTTP\n", payload_len);
+            printf("Application Data: %d bytes, not recognized as plaintext HTTP\n", payload_len);
         }
     }
     else
     {
-        printf("HTTP Message: none\n");
+        printf("Application Data: none\n");
     }
 }
 
@@ -325,6 +342,8 @@ int main(int argc, char *argv[])
     const char *dev = NULL;
     bpf_u_int32 net = 0;
     bpf_u_int32 mask = PCAP_NETMASK_UNKNOWN;
+    char net_str[INET_ADDRSTRLEN];
+    char mask_str[INET_ADDRSTRLEN];
 
     if (argc < 2)
     {
@@ -371,8 +390,8 @@ int main(int argc, char *argv[])
     }
 
     printf("Interface: %s\n", dev);
-    printf("Network: %s\n", inet_ntoa(*(struct in_addr *)&net));
-    printf("Netmask: %s\n", inet_ntoa(*(struct in_addr *)&mask));
+    printf("Network: %s\n", ip_to_string(*(struct in_addr *)&net, net_str, sizeof(net_str)));
+    printf("Netmask: %s\n", ip_to_string(*(struct in_addr *)&mask, mask_str, sizeof(mask_str)));
     printf("Filter: %s\n", filter_exp);
     pcap_loop(handle, -1, got_packet, NULL);
 
