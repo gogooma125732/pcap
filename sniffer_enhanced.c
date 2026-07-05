@@ -267,21 +267,17 @@ void got_packet(u_char *args, const struct pcap_pkthdr *header, const u_char *pa
     printf("Captured length: %u bytes, Original length: %u bytes\n",
            header->caplen, header->len);
 
-    printf("Ethernet Header\n");
-    printf("  MAC: ");
+    printf("Ethernet Header: ");
     print_mac(eth->ether_shost);
     printf(" / ");
     print_mac(eth->ether_dhost);
     printf("\n");
 
-    printf("IP Header\n");
-    printf("  IP: %s / %s\n", inet_ntoa(ip->iph_sourceip), inet_ntoa(ip->iph_destip));
-    printf("  IP Header Length: %d bytes | IP Total Length : %d bytes | TTL: %u\n", ip_header_len, ip_total_len, ip->iph_ttl);
+    printf("IP Header:  %s / %s\n", inet_ntoa(ip->iph_sourceip), inet_ntoa(ip->iph_destip));
+    printf("  Header Length: %d bytes | Total Length : %d bytes | TTL: %u\n", ip_header_len, ip_total_len, ip->iph_ttl);
 
-    printf("TCP Header\n");
-    printf("  Port: %u / %u\n", ntohs(tcp->tcp_sport), ntohs(tcp->tcp_dport));
-    printf("  TCP Header Length: %d bytes\n", tcp_header_len);
-    printf("  Flags: ");
+    printf("TCP Header: %u / %u\n", ntohs(tcp->tcp_sport), ntohs(tcp->tcp_dport));
+    printf("  Header Length: %d bytes | FLAGS: ", tcp_header_len);
     print_tcp_flags(tcp->tcp_flags);
     printf("\n");
 
@@ -302,12 +298,12 @@ void got_packet(u_char *args, const struct pcap_pkthdr *header, const u_char *pa
         }
         else
         {
-            printf("Application Data: %d bytes, not recognized as plaintext HTTP\n", payload_len);
+            printf("HTTP Message: %d bytes, not recognized as plaintext HTTP\n", payload_len);
         }
     }
     else
     {
-        printf("Application Data: none\n");
+        printf("HTTP Message: none\n");
     }
 }
 
