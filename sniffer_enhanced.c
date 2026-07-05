@@ -314,11 +314,10 @@ void got_packet(u_char *args, const struct pcap_pkthdr *header, const u_char *pa
 static void usage(const char *prog)
 {
     printf("Usage:\n");
-    printf("  Offline pcap analysis: %s -r <file.pcap> [bpf-filter]\n", prog);
-    printf("  Live capture         : %s -i <interface> [bpf-filter]\n", prog);
+    printf("  Live capture: %s <interface> [bpf-filter]\n", prog);
     printf("\nExamples:\n");
-    printf("  %s -r sample.pcap \"tcp port 80\"\n", prog);
-    printf("  sudo %s -i enp0s3 \"tcp port 80\"\n", prog);
+    printf("  sudo %s enp0s3 \"tcp port 80\"\n", prog);
+    printf("  sudo %s en0 \"tcp\"\n", prog);
 }
 
 int main(int argc, char *argv[])
@@ -327,32 +326,32 @@ int main(int argc, char *argv[])
     char errbuf[PCAP_ERRBUF_SIZE];
     struct bpf_program fp;
     const char *filter_exp = "tcp";
-    bpf_u_int32 net = PCAP_NETMASK_UNKNOWN;
+    const char *dev = NULL;
+    bpf_u_int32 net = 0;
+    bpf_u_int32 mask = PCAP_NETMASK_UNKNOWN;
 
-    if (argc < 3)
+    if (argc < 2)
     {
         usage(argv[0]);
         return EXIT_FAILURE;
     }
 
-    if (argc >= 4)
+    dev = argv[1];
+
+    if (argc >= 3)
     {
-        filter_exp = argv[3];
+        filter_exp = argv[2];
     }
 
-    if (strcmp(argv[1], "-r") == 0)
+    if (pcap_lookupnet(dev, &net, &mask, errbuf) == -1)
     {
-        handle = pcap_open_offline(argv[2], errbuf);
+        fprintf(stderr, "Could not get netmask for %s: %s\n", dev, errbuf);
+        fprintf(stderr, "Continue with PCAP_NETMASK_UNKNOWN.\n");
+        net = 0;
+        mask = PCAP_NETMASK_UNKNOWN;
     }
-    else if (strcmp(argv[1], "-i") == 0)
-    {
-        handle = pcap_open_live(argv[2], BUFSIZ, 1, 1000, errbuf);
-    }
-    else
-    {
-        usage(argv[0]);
-        return EXIT_FAILURE;
-    }
+
+    handle = pcap_open_live(dev, BUFSIZ, 1, 1000, errbuf);
 
     if (handle == NULL)
     {
@@ -360,7 +359,7 @@ int main(int argc, char *argv[])
         return EXIT_FAILURE;
     }
 
-    if (pcap_compile(handle, &fp, filter_exp, 0, net) == -1)
+    if (pcap_compile(handle, &fp, filter_exp, 0, mask) == -1)
     {
         pcap_perror(handle, "pcap_compile error");
         pcap_close(handle);
@@ -375,6 +374,9 @@ int main(int argc, char *argv[])
         return EXIT_FAILURE;
     }
 
+    printf("Interface: %s\n", dev);
+    printf("Network: %s\n", inet_ntoa(*(struct in_addr *)&net));
+    printf("Netmask: %s\n", inet_ntoa(*(struct in_addr *)&mask));
     printf("Filter: %s\n", filter_exp);
     pcap_loop(handle, -1, got_packet, NULL);
 
